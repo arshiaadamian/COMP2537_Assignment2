@@ -159,7 +159,7 @@ app.post("/loggingin", async (req, res) => {
 
   const result = await userCollection
     .find({ username: username })
-    .project({ username: 1, password: 1, _id: 1 })
+    .project({ username: 1, password: 1, name: 1, _id: 1 }) // Include 'name' in the projection
     .toArray();
 
   if (result.length !== 1) {
@@ -170,7 +170,7 @@ app.post("/loggingin", async (req, res) => {
   if (await bcrypt.compare(password, result[0].password)) {
     req.session.authenticated = true;
     req.session.username = username;
-    req.session.name = result[0].username; // Set the user's name in the session
+    req.session.name = result[0].name; // Use the user's name for the session
     req.session.cookie.maxAge = expireTime;
 
     return res.redirect("/loggedIn");
@@ -187,7 +187,7 @@ app.get("/loggedIn", (req, res) => {
   }
 
   let html = `
-      <h1>Hello ${req.session.name}</h1>
+      <h1>Hello ${req.session.name}</h1> <!-- Display the user's name -->
       <form action='/members' method='get'>
       <button>Go to Members Area</button>
       </form>
@@ -225,6 +225,12 @@ app.post("/submitUser", async (req, res) => {
     password: hashedPassword,
   });
   console.log("Inserted user");
+
+  // Authenticate the user and redirect to members page
+  req.session.authenticated = true;
+  req.session.username = username;
+  req.session.name = name; // Use the user's name for the session
+  req.session.cookie.maxAge = expireTime;
 
   res.redirect("/members");
 });
