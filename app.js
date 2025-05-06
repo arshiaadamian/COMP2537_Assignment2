@@ -201,13 +201,14 @@ app.get("/loggedIn", (req, res) => {
 app.post("/submitUser", async (req, res) => {
   const { name, username, password } = req.body;
 
-  // Validate username and password
+  // Validate name, username, and password
   const schema = Joi.object({
+    name: Joi.string().min(1).required(), // Ensure name is not empty
     username: Joi.string().email().required(),
     password: Joi.string().max(20).required(),
   });
 
-  const validationResult = schema.validate({ username, password });
+  const validationResult = schema.validate({ name, username, password });
   if (validationResult.error != null) {
     console.log(validationResult.error);
     return res.send(`
