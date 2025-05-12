@@ -1,0 +1,15 @@
+<% include ('templates/header') %> 
+<% if (error) { %>
+<div class="error">
+  <p style="color: red">Invalid input: <%= error %></p>
+  <a href="/createUser">Go back to sign-up page</a>
+</div>
+<% } else { %>
+<form action="/submitUser" method="post">
+  <input name="name" type="text" placeholder="name" />
+  <input name="username" type="text" placeholder="username" />
+  <input name="password" type="password" placeholder="password" />
+  <button>Submit</button>
+</form>
+<% } %>
+<% include ('templates/footer') %>
