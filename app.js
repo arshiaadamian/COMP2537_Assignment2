@@ -179,7 +179,7 @@ app.get("/loggedIn", (req, res) => {
     return res.redirect("/login");
   }
 
-  res.render("loggedIn", { name: req.session.name });
+  res.render("loggedin", { name: req.session.name });
 });
 
 // submit user
