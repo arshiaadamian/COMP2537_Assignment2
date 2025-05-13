@@ -3,6 +3,9 @@ require("dotenv").config();
 
 const express = require("express");
 const session = require("express-session");
+const { ObjectId } = require("mongodb");
+const url = require("url");
+
 
 // Initialize the app
 const app = express();
@@ -28,6 +31,10 @@ const userCollection = database.db(mongodb_database).collection("users");
 
 // Start the server
 const PORT = process.env.PORT || 8000;
+
+// set the ejs engine
+app.set("view engine", "ejs");
+app.set("views", __dirname + "/views");
 
 // MongoDB connection
 var mongoStore = MongoStore.create({
@@ -58,18 +65,24 @@ function isAuthenticated(req, res, next) {
   res.redirect("/login");
 }
 
+app.use("/", (req, res, next) => {
+  app.locals.navLinks = navLinks;
+  app.locals.currentURL = url.parse(req.url).pathname;
+  next();
+})
+
+const navLinks = [
+  {name: "Home", link: "/"},
+  {name: "Dogs", link: "/members"},
+  {name: "Login", link: "/login"},
+  {name: "Sign Up", link: "/createUser"},
+  {name: "Admin", link: "/admin"},
+  {name: "404", link: "/404"},
+]
+
 // Routes
 app.get("/", (req, res) => {
-  let html = `
-    <form action = '/login' method='get'>
-        <button>login</button>
-    </form>
-    <form action = '/createUser' method='get'>
-        <button>sign Up</button>
-    </form>
-    `;
-
-  res.send(html);
+  res.render("index");
 });
 
 app.get("/nosql-injection", async (req, res) => {
@@ -115,35 +128,14 @@ app.post("/submitEmail", (req, res) => {
 
 // sign up
 app.get("/createUser", (req, res) => {
-  var html = `
-    create user
-    <form action='/submitUser' method='post'>
-    <input name='name' type='text' placeholder='name'>
-    <input name='username' type='text' placeholder='username'>
-    <input name='password' type='password' placeholder='password'>
-    <button>Submit</button>
-    </form>
-    `;
-  res.send(html);
+  res.render("signup", {error: null});
 });
 
 // login
 app.get("/login", (req, res) => {
   const error = req.query.error;
-  let html = `
-      <h2>Log in</h2>
-      <form action='/loggingin' method='post'>
-        <input name='username' type='text' placeholder='username'>
-        <input name='password' type='password' placeholder='password'>
-        <button>Submit</button>
-      </form>
-    `;
 
-  if (error === "invalid") {
-    html += "<p style='color:red;'>Invalid username or password.</p>";
-  }
-
-  res.send(html);
+  res.render("login", { error: error });
 });
 
 // logging in
@@ -159,7 +151,7 @@ app.post("/loggingin", async (req, res) => {
 
   const result = await userCollection
     .find({ username: username })
-    .project({ username: 1, password: 1, name: 1, _id: 1 }) // Include 'name' in the projection
+    .project({ username: 1, password: 1, name: 1, user_type: 1 ,_id: 1 }) // Include 'name' in the projection
     .toArray();
 
   if (result.length !== 1) {
@@ -172,6 +164,7 @@ app.post("/loggingin", async (req, res) => {
     req.session.username = username;
     req.session.name = result[0].name; // Use the user's name for the session
     req.session.cookie.maxAge = expireTime;
+    req.session.user_type = result[0].user_type; // Use the user's type for the session
 
     return res.redirect("/loggedIn");
   } else {
@@ -186,15 +179,7 @@ app.get("/loggedIn", (req, res) => {
     return res.redirect("/login");
   }
 
-  let html = `
-      <h1>Hello ${req.session.name}</h1> <!-- Display the user's name -->
-      <form action='/members' method='get'>
-      <button>Go to Members Area</button>
-      </form>
-      <form action='/logout' method='get'>
-      <button>Logout</button>`;
-
-  res.send(html); // ← Send the HTML back
+  res.render("loggedIn", { name: req.session.name });
 });
 
 // submit user
@@ -209,12 +194,10 @@ app.post("/submitUser", async (req, res) => {
   });
 
   const validationResult = schema.validate({ name, username, password });
-  if (validationResult.error != null) {
-    console.log(validationResult.error);
-    return res.send(`
-      <p style="color: red;">Invalid input: ${validationResult.error.message}</p>
-      <a href="/createUser">Go back to sign-up page</a>
-    `);
+  const error = validationResult.error;
+  if (error) {
+    res.render("signup", { error: error });
+    return;
   }
 
   // Hash the password and insert the user into the database
@@ -224,6 +207,7 @@ app.post("/submitUser", async (req, res) => {
     name: name,
     username: username,
     password: hashedPassword,
+    user_type: "user",
   });
   console.log("Inserted user");
 
@@ -232,6 +216,7 @@ app.post("/submitUser", async (req, res) => {
   req.session.username = username;
   req.session.name = name; // Use the user's name for the session
   req.session.cookie.maxAge = expireTime;
+  req.session.user_type = "user";
 
   res.redirect("/members");
 });
@@ -248,49 +233,56 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.get("/members/:id", isAuthenticated, (req, res) => {
-  const dog = req.params.id;
-  let html = "";
-
-  if (dog == 1) {
-    html += 'dog 1: <img src="/dog1.gif" style="width: 250px;" />';
-  } else if (dog == 2) {
-    html += 'dog 2: <img src="/dog2.gif" style="width: 250px;" />';
-  } else if (dog == 3) {
-    html += 'dog 3: <img src="/dog3.gif" style="width: 250px;" />';
-  } else {
-    html += "invalid dog id: " + dog;
+function isAdmin(req) {
+  if(req.session.user_type === "admin") {
+    return true;
   }
+  return false;
+}
 
-  html += `
-      <form action='/logout' method='get'>
-        <button>Sign Out</button>
-      </form>
-    `;
+function adminAuthentication(req, res, next) {
+  if (!isAdmin(req)) {
+    res.status(403)
+    const user_type = req.session.user_type;
+    res.render("errorMessage", {error: "Not authorized as an admin", user_type: user_type});
+    return;
+  } else {
+    next();
+  }
+}
 
-  res.send(html);
+// admin page
+app.get("/admin", isAuthenticated, adminAuthentication, async (req, res) => {
+  const result = await userCollection.find().project({username: 1, _id: 1, name: 1, user_type: 1}).toArray();
+
+  res.render("admin", { name: req.session.name, users: result});
 });
 
 app.get("/members", isAuthenticated, (req, res) => {
-  const gifs = [
-    '<img src="/dog1.gif" style="width: 250px;" />',
-    '<img src="/dog2.gif" style="width: 250px;" />',
-    '<img src="/dog3.gif" style="width: 250px;" />',
-  ];
-  const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
+  const gifs = ["/dog1.gif", "/dog2.gif", "/dog3.gif"];
+  // const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
 
-  let html = `
-    ${randomGif}
-    <form action='/logout' method='get'>
-      <button>Sign Out</button>
-    </form>
-  `;
+  res.render("members", { gifs: gifs});
+});
 
-  res.send(html);
+app.post("/promoteUser", isAuthenticated, adminAuthentication, async (req, res) => {
+  const user_id = req.body.user_id;
+  await userCollection.updateOne(
+      { _id: new ObjectId(user_id) },
+      { $set: { user_type: "admin" } }
+    );
+  res.redirect("/admin");
+});
+
+app.post("/demoteUser", isAuthenticated, adminAuthentication, async (req, res) => {
+  const user_id = req.body.user_id;
+  await userCollection.updateOne({_id: new ObjectId(user_id)},
+    {$set: {user_type: "user"}});
+  res.redirect("/admin");
 });
 
 app.use((req, res) => {
-  res.status(404).send("404: Page not found");
+  res.status(404).render("404");
 });
 
 app.listen(PORT, () => {

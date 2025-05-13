@@ -1,11 +1,14 @@
-<% include ('templates/header') %>
+<%- include ('templates/header') %>
+
+<div class="container mt-5">
+  <div class="alert alert-danger text-center" role="alert">
+    <h4 class="alert-heading">Error</h4>
+    <p><%= error %></p>
+    <hr>
+    <p class="mb-2">Your user type: <strong><%= user_type %></strong></p>
+    <a href="/login" class="btn btn-outline-light btn-sm mt-2">Click here to go back to login</a>
+  </div>
+</div>
 
 
-    <div class="error">
-        <p><%= error %></p>
-        <p>Your user type: <%= user_type %></p>
-        <a href="/login">click here to go back to login</a>
-    </div>
-
-
-<% include ('templates/footer') %>
+<%- include ('templates/footer') %>

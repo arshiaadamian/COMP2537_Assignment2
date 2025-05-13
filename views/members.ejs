@@ -1,12 +1,12 @@
-<% include ('templates/header') %>
+<%- include ('templates/header') %>
 
 <!-- loop to display all the gifs. -->
 <% for (let i = 0; i < gifs.length; i++) { %>
-  <img src="<%= gifs[i] %>" alt="Random GIF" style="width: 250px" />
+  <img src="<%= gifs[i] %>" alt="dog GIF" style="width: 250px" class="img-thumbnail"/>
 <% } %>
 
 <form action="/logout" method="get">
-  <button>Sign Out</button>
+  <button class="btn btn-dark">Logout</button>
 </form>
 
-<% include ('templates/footer') %>
+<%- include ('templates/footer') %>
